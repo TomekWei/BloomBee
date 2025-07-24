@@ -103,6 +103,7 @@ class TransformerBackend(ModuleBackend): # hivemind: ModuleBackend.module: nn.Mo
 
         # Create CPU device list
         num_cpus = 1  # Can be adjusted as needed
+        self.original_devices = self.module.devices
         cpus = [torch.device('cpu') for _ in range(num_cpus)]
         
         # Set TensorParallel module to use CPU devices
@@ -111,7 +112,7 @@ class TransformerBackend(ModuleBackend): # hivemind: ModuleBackend.module: nn.Mo
         # If module has module_shards, move them to CPU
         if hasattr(self.module, 'module_shards'):
             for shard in self.module.module_shards:
-                shard.to('cpu')
+                shard.to_empty(device='cpu')
         
         # Set output device to CPU
         if hasattr(self.module, 'output_device_index'):
@@ -121,7 +122,7 @@ class TransformerBackend(ModuleBackend): # hivemind: ModuleBackend.module: nn.Mo
         self.module.need_delayed_init = True
         
         # Record original devices for restoration when needed
-        self.original_devices = self.module.devices
+        
         self.original_output_device_index = self.module.output_device_index
 
     def get_inference_cache_descriptors(self, batch_size: int, max_length: int) -> Sequence[TensorDescriptor]:
@@ -162,7 +163,7 @@ class TransformerBackend(ModuleBackend): # hivemind: ModuleBackend.module: nn.Mo
             # If module has module_shards, move them to original devices
             if hasattr(self.module, 'module_shards'):
                 for shard, device in zip(self.module.module_shards, self.original_devices):
-                    shard.to(device)
+                    shard.to_empty(device=device)
             
             # Mark for delayed initialization
             self.module.need_delayed_init = True

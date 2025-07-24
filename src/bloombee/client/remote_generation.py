@@ -48,8 +48,8 @@ class _SkipTokensMixin:
     # This override is used in RemoteGenerationMixin by has to be defined in a class not named as "GenerationMixin"
     # due to how transformers.PreTrainedModel.can_generate() works
     def prepare_inputs_for_generation(self, input_ids: torch.LongTensor, **kwargs) -> dict:
-        input_ids = input_ids[:, _skipped_tokens.get() :]
-        _skipped_tokens.set(0)
+        # input_ids = input_ids[:, _skipped_tokens.get() :]
+        # _skipped_tokens.set(0)
         return super().prepare_inputs_for_generation(input_ids, **kwargs)
 
 
@@ -121,7 +121,8 @@ class RemoteGenerationMixin(_SkipTokensMixin):
                     )
 
                 if inputs is not None:
-                    inputs = torch.cat([session.output_ids, inputs], dim=1)
+                    # inputs = torch.cat([session.output_ids, inputs], dim=1)
+                    inputs = session.output_ids
                 else:
                     inputs = session.output_ids
 

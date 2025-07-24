@@ -11,7 +11,7 @@ from transformers import AutoTokenizer
 
 from bloombee import AutoDistributedModelForCausalLM
 from bloombee.constants import DTYPE_MAP, PUBLIC_INITIAL_PEERS
-
+from bloombee.client.session_cache import set_cached_session, get_cached_session, clear_cached_session
 logger = get_logger()
 
 
@@ -58,14 +58,15 @@ def benchmark_inference(process_idx, args, result_pipe):
     logger.info(f"🔍 [Process {process_idx}] Starting inference session...")
     
     with model.transformer.h.inference_session(max_length=args.seq_len) as sess:
+        set_cached_session(sess)
         for step in range(args.seq_len):
             start_time = perf_counter()
 
             logger.info(f"🔍 [Process {process_idx}] Step {step} - Before generation:")
             logger.info(f"🔍 [Process {process_idx}] Current result length: {len(result)}")
             logger.info(f"🔍 [Process {process_idx}] Current result text: {repr(result)}")
-
-            outputs = model.generate(max_new_tokens=1, session=sess)
+            input_ids = tokenizer.encode("The", return_tensors="pt").to(model.device)
+            outputs = model.generate(input_ids = input_ids, max_new_tokens=1, session=sess)
             
 
             logger.info(f"🔍 [Process {process_idx}] Step {step} - After generation:")
