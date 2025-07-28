@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+from bloombee.server.block_factory import block_factory
 import torch
 from accelerate import init_empty_weights
 from transformers import PretrainedConfig, PreTrainedModel
@@ -14,6 +15,18 @@ from bloombee.flexgen_utils.policy import Policy
 from bloombee.flexgen_utils.pytorch_backend import fix_recursive_import
 from bloombee.flexgen_utils.utils import ValueHolder, array_1d
 
+MODEL_BLOCK_REGISTRY = {}
+
+
+
+def _create_default_block(**kwargs):
+    """
+    """
+    config = kwargs.get('config')
+    if not config or not hasattr(config, 'block_class'):
+        raise ValueError("Config or block_class is missing for default block creation.")
+    print(f"Server: Creating a default block of type {config.block_class.__name__}")
+    return config.block_class(config)
 
 def resolve_block_dtype(config: PretrainedConfig, dtype: Union[str, torch.dtype]) -> torch.dtype:
     """If dtype is "auto", resolves it using BloomConfig. Returns `dtype` intact otherwise."""
@@ -81,3 +94,33 @@ def get_model_block(config, env, policy, weight_home, path, layer_idx: int = 0):
     # res = config.block_class(config, layer_idx, env, policy, weight_home, path)  # go to block.py class OptimizedLlamaDecoderLayer
     # print(' get_model_block res  ', res)
     return res  # res is only nn.module without weights
+
+
+def get_model_block(config, env, policy, weight_home, path, layer_idx=0, **kwargs):
+    """
+    灵活的模型块创建函数，现在只是对工厂的简单调用。
+    """
+
+    if not hasattr(config, 'model_type'):
+        raise AttributeError("The 'config' object must have a 'model_type' attribute.")
+
+    model_name = config.model_type
+
+    # 将所有上下文参数传递给工厂
+    return block_factory.create(
+        model_name,
+        config=config,
+        layer_idx=layer_idx,
+        env=env,
+        policy=policy,
+        weight_home=weight_home,
+        path=path,
+        **kwargs
+    )
+    
+    
+@register_block("complex_model")
+class ComplexBlock:
+    def __init__(self, config, layer_idx, attention_type: str, **kwargs):
+        super().__init__(config)
+        self.attention_type = attention_type

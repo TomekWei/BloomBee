@@ -6,6 +6,7 @@ See commit history for authorship.
 import math  
 from typing import Optional, Tuple  
 
+from bloombee.models.registry import register_block
 import torch  
 import torch.nn as nn  
 import torch.nn.functional as F  
@@ -157,7 +158,7 @@ class OptimizedOPTAttention(OPTAttention):
 
 
 class OptimizedOPTDecoderLayer(OPTDecoderLayer):  
-    def __init__(self, config: OPTConfig):  
+    def __init__(self, config: OPTConfig, **kwargs):  
         nn.Module.__init__(self)  
         self.embed_dim = config.hidden_size  
         self.self_attn = OptimizedOPTAttention(config=config, is_decoder=True) 
@@ -218,7 +219,6 @@ class OptimizedOPTDecoderLayer(OPTDecoderLayer):
         print('attention_mask ', attention_mask)
         print('position_ids ', position_ids)
         print('cache_position ', cache_position)
-        
         print("DEBUG session ", kwargs.get("session", None))
         hidden_states, self_attn_weights, present_key_value = self.self_attn(  
             hidden_states=hidden_states, 
@@ -278,7 +278,7 @@ class OptimizedOPTDecoderLayer(OPTDecoderLayer):
     def input_layernorm(self) -> nn.LayerNorm:  # For compatibility with RemoteGenerationMixin  
         return self.decoder.self_attn_layer_norm 
 
-
+@register_block("opt")
 class WrappedOPTBlock(OptimizedOPTDecoderLayer):  
     def forward(  
         self,  

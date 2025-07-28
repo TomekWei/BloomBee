@@ -6,6 +6,7 @@ See commit history for authorship.
 import math
 from typing import Optional, Tuple
 
+from bloombee.models.registry import register_block
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -35,6 +36,7 @@ from bloombee.flexgen_utils.llama_config import get_llama_config, download_llama
 from bloombee.flexgen_utils.task import Task
 from transformers import AutoTokenizer
 import os
+# from bloombee.server.block_utils import MODEL_BLOCK_REGISTRY
 # import sys
 # sys.path.insert(0,'..')
 # sys.path.insert(0,'/flexgen_model_in_petals/src/petals/')
@@ -68,6 +70,17 @@ def apply_rotary_pos_emb(q, k, cos, sin):
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
+# def _create_llama_block(**kwargs):
+#     """工厂函数：专门用于创建 WrappedLlamaBlock"""
+#     print("Models: Executing Llama block factory.")
+#     config = kwargs['config']
+#     layer_idx = kwargs['layer_idx']
+#     env = kwargs['env']
+#     policy = kwargs['policy']
+#     weight_home = kwargs['weight_home']
+#     path = kwargs['path']
+    
+#     return WrappedLlamaBlock(config, layer_idx, env, policy, weight_home, path)
 
 
 
@@ -835,7 +848,7 @@ class OptimizedLlamaDecoderLayer(LlamaDecoderLayer):  # used in block_utils.py r
         return self.layers[j].temp_hidden_states.val
     
 #######################################################################################
-
+@register_block("llama")
 class WrappedLlamaBlock(OptimizedLlamaDecoderLayer):
     def forward(
         self,
@@ -936,3 +949,5 @@ def get_test_inputs(prompt_len, num_prompts, tokenizer):
     return (input_ids[0][:prompt_len],) * num_prompts
 
 
+# MODEL_BLOCK_REGISTRY[WrappedLlamaBlock] = _create_llama_block
+print("Models: WrappedLlamaBlock has been registered.")
