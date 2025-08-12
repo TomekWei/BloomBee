@@ -285,7 +285,7 @@ class InferenceSession:
         assert not self._closed and not self._server_sessions
         return self
 
-    def step(   # 执行一次推理步骤，处理输入数据和相应的提示与假设 ID，同时在可能出现错误的情况下进行重试。
+    def step(   
         self,
         inputs: torch.Tensor,
         prompts: Optional[torch.Tensor] = None,

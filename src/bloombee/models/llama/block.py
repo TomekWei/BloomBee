@@ -5,6 +5,7 @@ Based on https://github.com/huggingface/transformers/blob/main/src/transformers/
 import math
 from typing import Optional, Tuple
 
+from bloombee.models.registry import register_block
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -27,11 +28,19 @@ from bloombee.flexgen_utils.llama_config import get_llama_config, download_llama
 from bloombee.flexgen_utils.task import Task
 from transformers import AutoTokenizer
 import os
+
+# from bloombee.server.block_utils import MODEL_BLOCK_REGISTRY
+# import sys
+# sys.path.insert(0,'..')
+# sys.path.insert(0,'/flexgen_model_in_petals/src/petals/')
+# from memory_usage import see_memory_usage, nvidia_smi_usage
+
 from bloombee.utils.memory_usage import see_memory_usage, nvidia_smi_usage
 
 fix_recursive_import()
 
 from pynvml import *
+
 
 
 
@@ -554,7 +563,7 @@ class OptimizedLlamaDecoderLayer(LlamaDecoderLayer):
         self.temp_hidden.val = self.layers[j].temp_hidden_states.val
         return self.layers[j].temp_hidden_states.val
 
-
+@register_block("llama")
 class WrappedLlamaBlock(OptimizedLlamaDecoderLayer):
     def forward(
         self,
@@ -661,3 +670,4 @@ def get_test_inputs(prompt_len, num_prompts, tokenizer):
     prompts = [""]
     input_ids = tokenizer(prompts, padding=False, truncation=True).input_ids
     return (input_ids[0],) * num_prompts
+

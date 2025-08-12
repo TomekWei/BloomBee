@@ -13,7 +13,7 @@ from bloombee.client.inference_session import InferenceSession
 from bloombee.client.routing import RemoteSequenceManager
 from bloombee.client.sequential_autograd import _RemoteSequentialAutogradFunction
 from bloombee.data_structures import UID_DELIMITER
-
+from bloombee.client.session_cache import set_cached_session, get_cached_session, clear_cached_session
 logger = get_logger(__name__)
 
 
@@ -49,9 +49,10 @@ class RemoteSequential(nn.Module):
 
         self._active_session = ContextVar("active_session", default=None)
 
-    def forward(self, inputs: torch.Tensor, prompts: Optional[torch.Tensor] = None, **kwargs) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor, prompts: Optional[torch.Tensor] = None, **kwargs):
         assert inputs.ndim == 3, "inputs must be a tensor of shape [batch_size, seq_length, hidden_size]"
         print('client remote sequential self.active_session ', self.active_session)
+        
         if self.active_session is None:
             assert all(v is None for v in kwargs.values()), f"Extra kwargs are not supported in forward: {kwargs}"
             return _RemoteSequentialAutogradFunction.apply(inputs, prompts, self.sequence_manager)
@@ -59,16 +60,22 @@ class RemoteSequential(nn.Module):
             # self.active_session : <petals.client.inference_session.InferenceSession object at xxxxx>
             print('start client remote sequential self.active_session .step()')
             # print('**kwargs ', kwargs) #  {'hypo_ids': None}
-            return self.active_session.step(inputs, prompts, **kwargs) # start the model.transformer.h.inference_session
-
+            step_kwargs={}
+            if 'hypo_ids' in kwargs:
+                step_kwargs['hypo_ids'] = kwargs['hypo_ids']
+            output = self.active_session.step(inputs, prompts, **step_kwargs) # start the model.transformer.h.inference_session
+            return (output,None)
     @property
     def active_session(self) -> Optional[InferenceSession]:
         """
         If called inside `with model.inference_session(...):` or `with model.use_session(...):`,
         returns an active InferenceSession. Otherwise, returns None.
         """
-
-        return self._active_session.get()
+        if self._active_session.get() is None:
+            
+            return get_cached_session()
+        else:
+            return self._active_session.get()
 
     @property
     def position(self) -> int:

@@ -129,6 +129,7 @@ class TransformerBackend(ModuleBackend): # hivemind: ModuleBackend.module: nn.Mo
         self.original_devices = self.module.devices
         self.original_output_device_index = getattr(self.module, 'output_device_index', 0)
 
+
     def get_inference_cache_descriptors(self, batch_size: int, max_length: int) -> Sequence[TensorDescriptor]:
         """Create tensor descriptors for attention cache tensors used during inference_step"""
         head_dim = self.config.hidden_size // self.config.num_attention_heads
@@ -167,7 +168,7 @@ class TransformerBackend(ModuleBackend): # hivemind: ModuleBackend.module: nn.Mo
             # If module has module_shards, move them to original devices
             if hasattr(self.module, 'module_shards'):
                 for shard, device in zip(self.module.module_shards, self.original_devices):
-                    shard.to(device)
+                    shard.to_empty(device=device)
             
             # Mark for delayed initialization
             self.module.need_delayed_init = True

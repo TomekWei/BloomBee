@@ -1,0 +1,59 @@
+from typing import Optional
+
+import torch
+import torch.nn as nn
+from transformers.models.{{ transformers_model_type }} import (
+    {{ model_name }}Model, 
+    {{ model_name }}ForCausalLM, 
+    {{ model_name }}ForSequenceClassification,
+    {{ model_name }}PreTrainedModel
+)
+
+from bloombee.client.from_pretrained import FromPretrainedMixin
+from bloombee.client.lm_head import LMHead
+from bloombee.client.ptune import PTuneMixin
+from bloombee.client.remote_generation import RemoteGenerationMixin
+from bloombee.client.remote_sequential import RemoteSequential
+from bloombee.models.{{ model_name_lower }}.config import Distributed{{ model_name }}Config
+
+
+class Distributed{{ model_name }}Model(FromPretrainedMixin, PTuneMixin, {{ model_name }}Model):
+    _keys_to_ignore_on_load_missing = PTuneMixin._keys_to_ignore_on_load_missing
+    _keys_to_ignore_on_load_unexpected = [r"^{{ block_prefix }}\."]
+
+    config_class = Distributed{{ model_name }}Config
+
+    def __init__(self, config: Distributed{{ model_name }}Config):
+        n_layer, config.num_hidden_layers = config.num_hidden_layers, 0
+        super().__init__(config)
+        config.num_hidden_layers = n_layer
+
+        self.layers = RemoteSequential(config)
+        self.requires_grad_(False)
+        self.init_prompts(config)
+
+    {%- for property_name, property_value in model_properties.items() %}
+    @property
+    def {{ property_name }}(self):
+        return {{ property_value }}
+    {%- endfor %}
+
+
+class Distributed{{ model_name }}ForCausalLM(FromPretrainedMixin, RemoteGenerationMixin, {{ model_name }}ForCausalLM):
+    _keys_to_ignore_on_load_missing = Distributed{{ model_name }}Model._keys_to_ignore_on_load_missing
+    _keys_to_ignore_on_load_unexpected = Distributed{{ model_name }}Model._keys_to_ignore_on_load_unexpected
+
+    config_class = Distributed{{ model_name }}Config
+
+    def __init__(self, config: Distributed{{ model_name }}Config):
+        {{ model_name }}PreTrainedModel.__init__(self, config)
+        self.model = Distributed{{ model_name }}Model(config)
+        self.lm_head = LMHead(config)
+        self.post_init()
+
+    def get_output_embeddings(self):
+        return self.lm_head
+
+    @property
+    def transformer(self) -> Distributed{{ model_name }}Model:
+        return self.model

@@ -1,0 +1,21 @@
+from bloombee.models.{{ model_name_lower }}.block import Wrapped{{ model_name }}Block
+from bloombee.models.{{ model_name_lower }}.config import Distributed{{ model_name }}Config
+from bloombee.models.{{ model_name_lower }}.model import (
+    Distributed{{ model_name }}ForCausalLM,
+    Distributed{{ model_name }}ForSequenceClassification,
+    Distributed{{ model_name }}Model,
+)
+{%- if include_speculative %}
+from bloombee.models.{{ model_name_lower }}.speculative_model import Distributed{{ model_name }}ForSpeculativeGeneration
+{%- endif %}
+from bloombee.utils.auto_config import register_model_classes
+
+register_model_classes(
+    config=Distributed{{ model_name }}Config,
+    model=Distributed{{ model_name }}Model,
+    model_for_causal_lm=Distributed{{ model_name }}ForCausalLM,
+    {%- if include_speculative %}
+    model_for_speculative=Distributed{{ model_name }}ForSpeculativeGeneration,
+    {%- endif %}
+    model_for_sequence_classification=Distributed{{ model_name }}ForSequenceClassification,
+)

@@ -1,0 +1,60 @@
+import os
+from typing import Optional, Union
+
+from hivemind import get_logger
+from transformers.models.{{ transformers_model_type }} import {{ model_name }}Config
+from transformers.models.{{ transformers_model_type }}.modeling_{{ transformers_model_type }} import {{ model_name }}Attention
+
+from bloombee.client.config import ClientConfig
+from bloombee.client.lm_head import LMHeadConfig
+from bloombee.client.ptune import PTuneConfig
+from bloombee.models.{{ model_name_lower }}.block import Wrapped{{ model_name }}Block
+
+logger = get_logger(__name__)
+
+
+class Distributed{{ model_name }}Config({{ model_name }}Config, ClientConfig, PTuneConfig, LMHeadConfig):
+    block_class = Wrapped{{ model_name }}Block
+    attn_class = {{ model_name }}Attention
+    block_prefix = "{{ block_prefix }}"
+
+    {%- if num_key_value_heads_attr %}
+    @property
+    def num_key_value_groups(self):
+        return self.num_attention_heads // self.{{ num_key_value_heads_attr }}
+    {%- else %}
+    num_key_value_groups = 1
+    {%- endif %}
+
+    @classmethod
+    def from_pretrained(
+        cls, model_name_or_path: Union[str, os.PathLike, None], *args, dht_prefix: Optional[str] = None, **kwargs
+    ):
+        {%- if license_info %}
+        logger.info("{{ license_info }}")
+        {%- endif %}
+
+        loading_from_repo = model_name_or_path is not None and not os.path.isdir(model_name_or_path)
+        if loading_from_repo and dht_prefix is None:
+            dht_prefix = str(model_name_or_path)
+            dht_prefix = dht_prefix.split("/")[-1]
+            dht_prefix = dht_prefix.replace(".", "-")
+            {%- if dht_prefix_suffix %}
+            if not dht_prefix.endswith("{{ dht_prefix_suffix }}"):
+                dht_prefix += "{{ dht_prefix_suffix }}"
+            {%- endif %}
+            logger.info(f"Using DHT prefix: {dht_prefix}")
+
+        result = super().from_pretrained(model_name_or_path, *args, dht_prefix=dht_prefix, **kwargs)
+        config = result[0] if isinstance(result, tuple) else result
+        
+        {%- for key, value in config_overrides.items() %}
+        config.{{ key }} = {{ value }}
+        {%- endfor %}
+        
+        {%- if needs_pad_token %}
+        if config.pad_token_id is None:
+            config.pad_token_id = 0
+        {%- endif %}
+        
+        return result
